@@ -21,6 +21,7 @@ Return all active WMI event objects with the name 'RedTeamEvent'
 
 ```Get-WmiEvent -Name RedTeamEvent```
 
+Twitter - @sw4mp_fox
 Delete 'RedTeamEvent' WMI event objects
 
 ```Get-WmiEvent -Name RedTeamEvent | Remove-WmiObject```
