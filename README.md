@@ -1,5 +1,7 @@
 # PowerLurk
 
+PowerLurk is a PowerShell toolset for building malicious WMI Event Subsriptions. The goal is to make WMI events easier to fire off during a penetration test or red team engagement. Please see my post 'Creeping on Users with WMI Events: Introducing PowerLurk' for more detailed information: https://pentestarmoury.com/2016/07/13/151/
+
 To use PowerLurk, you must import the PowerLurk.ps1 module into your instance of PowerShell. This can be done a couple of ways:
 
 Import locally
