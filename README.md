@@ -62,3 +62,5 @@ Extract KeeThief output from WMI class
 Cleanup KeeThiefLurker
 
 ```Remove-KeeThiefLurker -EventName KeeThief -WMI```
+
+Twitter - @sw4mp_f0x
