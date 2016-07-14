@@ -764,7 +764,7 @@ By default, this cmdlet returns a System.Management.ManagementBaseObject.Managem
     Switch ($Trigger){
         'InsertUSB' {$Query = 'SELECT * FROM Win32_VolumeChangeEvent WHERE EventType = 2'}
         'UserLogon' {
-            if ($UserName){
+            if ($UserName -eq 'any' -or $UserName -eq '*'){
                 $Query = "SELECT * FROM __InstanceCreationEvent WITHIN 10 WHERE TargetInstance ISA 'Win32_LoggedOnUser' AND TargetInstance.__RELPATH like `"%$Domain%$UserName%`""
             }else{
                 $Query = "SELECT * FROM __InstanceCreationEvent WITHIN 10 WHERE TargetInstance ISA 'Win32_LoggedOnUser'"
