@@ -5,7 +5,7 @@ function Add-KeeThiefLurker{
 
 Adds a permanent WMI event that will execute KeeThief functionality utilizing registry or WMI-based data storage.
 
-.DEFINITION
+.DESCRIPTION
 
 Add-KeeThiefLurker creates a permanent WMI event that will execute KeeThief (See @Harmj0y's KeeThief at 
 https://github.com/adaptivethreat/KeeThief) 4 minutes after the 'keepass' process starts. This gives the target 
@@ -222,7 +222,7 @@ function Remove-KeeThiefLurker{
 
 Removes formerly added KeeThiefLurker.
 
-.DEFINITION
+.DESCRIPTION
 
 Remove-KeeThiefLurker deletes the permanent WMI event and associated trigger and consumer. It also removes registry or 
 WMI storage components. In order to do this, the same arguments must be pass to this cmdlet as they were when creating

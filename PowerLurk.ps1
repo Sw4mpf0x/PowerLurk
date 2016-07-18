@@ -5,7 +5,7 @@ function Get-WmiEvent {
 
 By default, Get-WmiEvent queries WMI for all __FilterToConsumerBinding instances and associated __EventFilter, and __EventConsumer instances. 
 
-.DEFINITION
+.DESCRIPTION
 
 Default output are all instances of the __FilterToConsumerBinding class and their associated __EventFilter and 
 __EventConsumer objects.
@@ -122,7 +122,7 @@ function Register-MaliciousWMIEvent {
 
 Registers a malicious Permanent WMI Event using predefinied triggers and a specified action.
 
-.DEFINITION
+.DESCRIPTION
 
 This cmdlet is the core of PowerLurk. It takes a command, script, or scriptblock as the action and a precanned trigger then creates the WMI Filter, Consumer, and FilterToConsumerBinding required for a fully functional Permanent WMI Event Subscription. A number of WMI event triggers, or filters, are preconfigured. The trigger must be specified with the -Trigger parameter. There are three consumers to choose from, PermanentCommand, PermanentScript, and LocalScriptBLock. Example usage: 
 
@@ -594,7 +594,7 @@ function Add-TemplateLurker{
 
 Adds a permanent WMI event that utilizes either registry values or a custom WMI namespace and class to store encoded Powershell logic and its output.
 
-.DEFINITION
+.DESCRIPTION
 
 Add-TemplateLurker creates a permanent WMI event that will execute a provided payload when
 
@@ -806,7 +806,7 @@ function Remove-TemplateLurker{
 
 Removes formerly added TemplateLurker.
 
-.DEFINITION
+.DESCRIPTION
 
 Remove-TemplateLurker deletes the permanent WMI event and associated filter and consumer. It also removes registry or 
 WMI storage components. In order to do this, the same arguments must be pass to this cmdlet as they were when creating
