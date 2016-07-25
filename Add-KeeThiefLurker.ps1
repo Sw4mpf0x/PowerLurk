@@ -362,3 +362,152 @@ be revoked.
     }
 
 }
+
+
+function Grant-WmiNameSpaceRead {
+<#
+    .SYNOPSIS
+    
+        Grants remote read access to 'Everyone' for a given WMI namespace.
+        Access can be revoked with Revoke-WmiNameSpaceRead.
+        Heavily adapted from Steve Lee's example code on MSDN, originally licenses. 
+        Taken from @enigma0x3's PowerSCCM (https://github.com/PowerShellMafia/PowerSCCM/blob/master/PowerSCCM.ps1).
+   
+    .PARAMETER Namespace
+        Namespace to allow a read permission form.   
+    .PARAMETER ComputerName
+        The computer to grant read access to the specified namespace on.
+    .PARAMETER Credential
+        A [Management.Automation.PSCredential] object to use for the remote connection.
+    .EXAMPLE
+        PS C:\> Grant-WmiNameSpaceRead -NameSpace 'root\Microsoft\Windows'
+    .EXAMPLE
+        PS C:\> $Cred = Get-Credential
+        PS C:\> Grant-WmiNameSpaceRead -NameSpace 'root\Microsoft\Windows' -ComputerName sccm.testlab -Credential $Cred
+    .LINK
+        http://blogs.msdn.com/b/wmi/archive/2009/07/27/scripting-wmi-namespace-security-part-3-of-3.aspx
+        http://vniklas.djungeln.se/2012/08/22/set-up-non-admin-account-to-access-wmi-and-performance-data-remotely-with-powershell/
+#>
+    [CmdletBinding()]
+    param(
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $NameSpace = 'root\Microsoft\Windows',
+
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $ComputerName = ".",
+
+        [Management.Automation.PSCredential]
+        [Management.Automation.CredentialAttribute()]
+        $Credential = [Management.Automation.PSCredential]::Empty
+    )    
+
+    # needed for non-DCs - add 'Everyone' to the 'Distributed COM Users' localgroup
+    $Group = [ADSI]("WinNT://$ComputerName/Distributed COM Users,group")
+
+    if ($PSBoundParameters.ContainsKey("Credential")) {
+        $Params = @{Namespace=$Namespace; Path="__systemsecurity=@"; ComputerName=$ComputerName; Credential=$Credential}
+
+        # alternate credentials for the adsi WinNT service provider
+        $Group.PsBase.Username = $Credential.Username
+        $Group.PsBase.Password = $Credential.GetNetworkCredential().Password
+    }
+    else {
+        $Params = @{Namespace=$Namespace; Path="__systemsecurity=@"; ComputerName=$ComputerName}
+    }
+
+    try {
+        # actually add 'Everyone' to 'Distributed COM Users'
+        $Group.Add("WinNT://everyone,user")
+    }
+    catch {
+        Write-Warning $_
+    }
+
+    $WmiObjectAcl = $(Invoke-WmiMethod -Name GetSecurityDescriptor @Params).Descriptor
+
+    # 33 = enable + remote access
+    $WmiAce = (New-Object System.Management.ManagementClass("win32_Ace")).CreateInstance()
+    $WmiAce.AccessMask = 33
+    $WmiAce.AceFlags = 0
+
+    $WmiTrustee = (New-Object System.Management.ManagementClass("win32_Trustee")).CreateInstance()
+    
+    # sid of "S-1-1-0" = "Everyone"
+    $WmiTrustee.SidString = "S-1-1-0"
+    $WmiAce.Trustee = $WmiTrustee
+    $WmiAce.AceType = 0x0
+    $WmiObjectacl.DACL += $WmiAce.PSObject.ImmediateBaseObject
+
+    $Params += @{Name="SetSecurityDescriptor"; ArgumentList=$WmiObjectAcl.PSObject.ImmediateBaseObject}
+    $Output = Invoke-WmiMethod @Params
+    if ($Output.ReturnValue -ne 0) {
+        throw "SetSecurityDescriptor failed: $($Output.ReturnValue)"
+    }
+}
+
+function Revoke-WmiNameSpaceRead {
+<#
+    .SYNOPSIS
+    
+        Removes remote read access from 'Everyone' for a given WMI namespace that
+        was granted by Grant-WmiNameSpaceRead.
+        Heavily adapted from Steve Lee's example code on MSDN, originally licenses.
+        Taken from @enigma0x3's PowerSCCM (https://github.com/PowerShellMafia/PowerSCCM/blob/master/PowerSCCM.ps1).
+   
+    .PARAMETER Namespace
+        Namespace to allow a read permission form.   
+    .PARAMETER ComputerName
+        The computer to revoke read access to the specified namespace on.
+    .PARAMETER Credential
+        A [Management.Automation.PSCredential] object to use for the remote connection.
+    .EXAMPLE
+        PS C:\> Revoke-WmiNameSpaceRead -NameSpace 'root\Microsoft\Windows'
+    .EXAMPLE
+        PS C:\> $Cred = Get-Credential
+        PS C:\> Revoke-WmiNameSpaceRead -NameSpace 'root\Microsoft\Windows' -ComputerName sccm.testlab -Credential $Cred
+    .LINK
+        http://blogs.msdn.com/b/wmi/archive/2009/07/27/scripting-wmi-namespace-security-part-3-of-3.aspx
+        http://vniklas.djungeln.se/2012/08/22/set-up-non-admin-account-to-access-wmi-and-performance-data-remotely-with-powershell/
+#>
+    [CmdletBinding()]
+    param(
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $NameSpace = 'root\Microsoft\Windows',
+
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $ComputerName = ".",
+
+        [Management.Automation.PSCredential]
+        [Management.Automation.CredentialAttribute()]
+        $Credential = [Management.Automation.PSCredential]::Empty
+    )    
+
+    $Group = [ADSI]("WinNT://$ComputerName/Distributed COM Users,group")
+
+    if ($PSBoundParameters.ContainsKey("Credential")) {
+        $Params = @{Namespace=$Namespace; Path="__systemsecurity=@"; ComputerName=$ComputerName; Credential=$Credential}
+        $Group.PsBase.Username = $Credential.Username
+        $Group.PsBase.Password = $Credential.GetNetworkCredential().Password
+    }
+    else {
+        $Params = @{Namespace=$Namespace; Path="__systemsecurity=@"; ComputerName=$ComputerName}
+    }
+
+    # remove 'Everyone' from the 'Distributed COM Users' local group on the remote server
+    $Group.Remove("WinNT://everyone,user")
+
+    $WmiObjectAcl = $(Invoke-WmiMethod -Name GetSecurityDescriptor @Params).Descriptor
+
+    # remove the 'Everyone' ('S-1-1-0') DACL
+    $WmiObjectAcl.DACL = $WmiObjectAcl.DACL | Where-Object {$_.Trustee.SidString -ne 'S-1-1-0'} | ForEach-Object { $_.psobject.immediateBaseObject }
+
+    $Params += @{Name="SetSecurityDescriptor"; ArgumentList=$WmiObjectAcl.PSObject.ImmediateBaseObject}
+    $Output = Invoke-WmiMethod @Params
+    if ($Output.ReturnValue -ne 0) {
+        throw "SetSecurityDescriptor failed: $($Output.ReturnValue)"
+    }
+}
