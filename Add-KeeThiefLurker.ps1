@@ -137,7 +137,7 @@ will be readable remotely by 'Everyone'
             # Create custom WMI class
             $CustomClass = New-Object Management.ManagementClass("$NamespaceName", $null, $null)
             $CustomClass.Name = "Win32_$ClassName"
-            $CustomClass.Properties.Add(‘Content', $Payload)
+            $CustomClass.Properties.Add('Content', $Payload)
             $CustomClass.Put() | Out-Null
 
             Write-Verbose "Custom WMI Class Win32_$ClassName Created"
